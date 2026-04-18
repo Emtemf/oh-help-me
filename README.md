@@ -101,6 +101,80 @@
 - `legacy-code.md` - 增量检查策略
 - `layer-*.md` - 各层特定规则
 
+## 验证示例
+
+### 场景 1：无新增文件
+
+```bash
+$ git diff --name-status HEAD
+M   .omc/state/hud-stdin-cache.json
+
+$ /architecture-check
+## 架构检查结果
+✅ 未发现架构违规问题
+```
+
+**说明**：git diff 中无 `A` 状态的 `.java` 文件，跳过检查。
+
+### 场景 2：新增文件包含架构违规
+
+```bash
+$ git diff --name-status HEAD
+A   src/main/java/com/example/api/NewApiReq.java
+M   src/main/java/com/example/api/OrderRsp.java
+
+$ /architecture-check
+## 架构检查结果
+| 严重 | 文件 | 行号 | 问题 | 建议 |
+|------|------|------|------|------|
+| 🔴 CRITICAL | api/NewApiReq.java | 3 | 接口层 import 基础设施层 OrderEntity | Entity 不可泄露到接口层，移除 import |
+```
+
+**说明**：
+- `NewApiReq.java` 是新增文件（A），触发严格检查
+- `OrderRsp.java` 是修改文件（M），不触发架构检查
+
+### 场景 3：指定路径检查
+
+```bash
+$ /architecture-check src/main/java/com/example/infra
+## 架构检查结果
+✅ 未发现架构违规问题
+```
+
+**说明**：`infra` 目录下无新增文件，跳过检查。
+
+### 场景 4：全面检查
+
+```bash
+$ /check
+## 架构检查结果
+| 严重 | 文件 | 行号 | 问题 | 建议 |
+|------|------|------|------|------|
+| 🔴 CRITICAL | api/NewApiReq.java | 3 | 接口层 import 基础设施层 | 移除 import |
+
+## 安全检查结果
+| 严重 | 文件 | 行号 | 问题 | 建议 |
+|------|------|------|------|------|
+| 🔴 CRITICAL | infra/OrderMapper.java | 8 | MyBatis 使用 ${} 存在 SQL 注入风险 | 改用 #{} |
+
+## 质量检查结果
+| 严重 | 文件 | 行号 | 问题 | 建议 |
+|------|------|------|------|------|
+| 🟡 WARNING | app/OrderService.java | 10 | 方法长度超过 50 行 | 拆分方法 |
+| 🔴 CRITICAL | app/OrderService.java | 65 | 空 catch 块 | 添加异常处理 |
+```
+
+## 验证覆盖
+
+| 场景 | 预期行为 | 验证结果 |
+|------|----------|----------|
+| 无新增文件 | 跳过检查 | ✅ 通过 |
+| 新增文件有违规 | 报告 CRITICAL | ✅ 通过 |
+| 修改文件不检查 | 不报告 | ✅ 通过 |
+| 存量文件不检查 | 不报告 | ✅ 通过 |
+| 指定路径无新增 | 跳过检查 | ✅ 通过 |
+
 ## 许可证
 
 MIT
