@@ -1,0 +1,16 @@
+{
+  "name": "ohm",
+  "version": "1.0.0",
+  "description": "oh-help-me 个人工作流插件",
+  "author": {
+    "name": "wula"
+  },
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "plugin",
+    "check",
+    "clean-architecture"
+  ],
+  "skills": "./skills/"
+}

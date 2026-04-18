@@ -1,0 +1,20 @@
+{
+  "name": "ohm-local",
+  "owner": {
+    "name": "wula"
+  },
+  "metadata": {
+    "description": "Local marketplace for the ohm Claude Code plugin"
+  },
+  "plugins": [
+    {
+      "name": "ohm",
+      "description": "oh-help-me 个人工作流插件",
+      "version": "1.0.0",
+      "source": "./",
+      "author": {
+        "name": "wula"
+      }
+    }
+  ]
+}
