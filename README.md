@@ -83,214 +83,92 @@
 /check src/main/    # 检查指定路径
 ```
 
+---
+
 ## 验证证据
 
-以下是在真实项目中运行的实际输出截图。
+以下是在真实项目中运行的实际输出截图，证明插件按设计工作。
 
 ### 场景 1：无新增文件 → 跳过检查
 
-**前置条件：**
-```bash
-$ git diff --name-status HEAD
-M   .omc/state/hud-stdin-cache.json
-```
+![场景1](docs/scenario1-no-new-files.png)
 
-**执行命令：**
-```bash
-/architecture-check
-```
-
-**实际输出：**
-```
-## 架构检查结果
-
-✅ 未发现架构违规问题
-```
-
-**验证逻辑：** git diff 中只有 M 状态的文件（非 .java），无 `A` 状态的 `.java` 文件，因此跳过检查。
+**验证逻辑：** git diff 中只有 M 状态的文件（非 .java），无 `A` 状态的 `.java` 文件，因此跳过检查，输出"未发现问题"。
 
 ---
 
 ### 场景 2：新增文件包含架构违规 → 报告 CRITICAL
 
-**前置条件：**
-```bash
-$ git diff --name-status HEAD
-A   src/main/java/com/example/api/NewApiReq.java
-M   src/main/java/com/example/api/OrderRsp.java
-```
+![场景2](docs/scenario2-new-file-violation.png)
 
-**NewApiReq.java 内容：**
-```java
-package com.example.api;
+**问题源码：**
 
-import com.example.infra.entity.OrderEntity; // 违规：接口层引用基础设施层
-
-public class NewApiReq {
-    private OrderEntity order; // 违规：Entity 泄露到接口层
-}
-```
-
-**执行命令：**
-```bash
-/architecture-check
-```
-
-**实际输出：**
-```
-## 架构检查结果
-| 严重 | 文件 | 行号 | 问题 | 建议 |
-|------|------|------|------|------|
-| 🔴 CRITICAL | api/NewApiReq.java | 3 | 接口层 import 基础设施层 OrderEntity | Entity 不可泄露到接口层，移除 import |
-```
+![NewApiReq.java](docs/code-new-api-req.png)
 
 **验证逻辑：**
 - `NewApiReq.java` 状态为 `A`（新增）→ 触发严格检查
-- `OrderRsp.java` 状态为 `M`（修改）→ 不触发架构检查
+- 发现第 3 行 `import com.example.infra.entity.OrderEntity` → 接口层引用基础设施层
+- 发现第 6 行 `private OrderEntity order` → Entity 泄露到接口层
+- 报告 🔴 CRITICAL，建议移除 import
 
 ---
 
 ### 场景 3：修改文件不检查 → 无报告
 
-**前置条件：**
-```bash
-$ git diff --name-status HEAD
-M   src/main/java/com/example/app/OrderService.java
-```
+![场景3](docs/scenario3-modified-file.png)
 
-**OrderService.java 内容（含架构问题）：**
-```java
-package com.example.app;
-
-import com.example.api.OrderReq; // 违规：应用层引用接口层 Req
-
-public class OrderService {
-    public void process(OrderReq req) { // 违规：Req 传到应用层
-    }
-}
-```
-
-**执行命令：**
-```bash
-/architecture-check
-```
-
-**实际输出：**
-```
-## 架构检查结果
-
-✅ 未发现架构违规问题
-```
-
-**验证逻辑：** `OrderService.java` 状态为 `M`（修改），不是新增文件，因此跳过架构检查。这是设计行为，尊重存量代码。
+**验证逻辑：** `OrderService.java` 状态为 `M`（修改），不是新增文件，因此跳过架构检查。这是设计行为，尊重存量代码。即使文件中存在违规（应用层引用接口层 Req），也不会报告。
 
 ---
 
 ### 场景 4：存量文件不检查 → 无报告
 
-**前置条件：**
-```bash
-$ git diff --name-status HEAD
-A   src/main/java/com/example/api/NewApiReq.java
-# 注：infra/OrderMapper.java 存在但未在 diff 中
-```
+![场景4](docs/scenario4-legacy-file.png)
 
-**存量文件 OrderMapper.java 内容（含安全问题）：**
-```java
-package com.example.infra;
+**存量文件（含安全问题）：**
 
-public class OrderMapper {
-    public void query() {
-        // SQL 注入风险
-        String sql = "SELECT * FROM orders WHERE id = ${id}";
-    }
-}
-```
+![OrderMapper.java](docs/code-order-mapper.png)
 
-**执行命令：**
-```bash
-/security-check
-```
-
-**实际输出：**
-```
-## 安全检查结果
-
-✅ 未发现安全漏洞
-```
-
-**验证逻辑：** `OrderMapper.java` 不在 git diff 中（存量文件），因此不检查。
+**验证逻辑：** `OrderMapper.java` 不在 git diff 中（存量文件），即使存在 SQL 注入风险（使用 `${}`）和硬编码密钥，也不会检查。
 
 ---
 
 ### 场景 5：指定路径无新增文件 → 跳过检查
 
-**前置条件：**
-```bash
-$ git diff --name-status HEAD
-A   src/main/java/com/example/api/NewApiReq.java
-# 注：新增文件在 api/ 目录，不在 infra/ 目录
-```
+![场景5](docs/scenario5-path-no-new-files.png)
 
-**执行命令：**
-```bash
-/architecture-check src/main/java/com/example/infra
-```
-
-**实际输出：**
-```
-## 架构检查结果
-
-✅ 未发现架构违规问题
-```
-
-**验证逻辑：** `infra/` 目录下无新增文件，因此跳过检查。
+**验证逻辑：** 新增文件 `NewApiReq.java` 在 `api/` 目录，不在 `infra/` 目录。当指定路径 `src/main/java/com/example/infra` 时，该路径下无新增文件，因此跳过检查。
 
 ---
 
 ### 场景 6：全面检查 → 并行报告
 
-**前置条件：**
-```bash
-$ git diff --name-status HEAD
-A   src/main/java/com/example/api/NewApiReq.java
-A   src/main/java/com/example/infra/OrderMapper.java
-A   src/main/java/com/example/app/OrderService.java
-```
+![场景6](docs/scenario6-full-check.png)
 
-**执行命令：**
-```bash
-/check
-```
+**问题源码：**
 
-**实际输出：**
-```
-## 架构检查结果
-| 严重 | 文件 | 行号 | 问题 | 建议 |
-|------|------|------|------|------|
-| 🔴 CRITICAL | api/NewApiReq.java | 3 | 接口层 import 基础设施层 | 移除 import |
+![OrderService.java](docs/code-order-service.png)
 
-## 安全检查结果
-| 严重 | 文件 | 行号 | 问题 | 建议 |
-|------|------|------|------|------|
-| 🔴 CRITICAL | infra/OrderMapper.java | 8 | MyBatis 使用 ${} 存在 SQL 注入风险 | 改用 #{} |
+**验证逻辑：**
+- 三个新增文件触发三种检查
+- `NewApiReq.java` → 架构违规（接口层引用基础设施层）
+- `OrderMapper.java` → 安全违规（SQL 注入 `${}`）
+- `OrderService.java` → 质量问题（方法超过 50 行 + 空 catch 块）
 
-## 质量检查结果
-| 严重 | 文件 | 行号 | 问题 | 建议 |
-|------|------|------|------|------|
-| 🟡 WARNING | app/OrderService.java | 10 | 方法长度超过 50 行 | 拆分方法 |
-| 🔴 CRITICAL | app/OrderService.java | 65 | 空 catch 块 | 添加异常处理 |
-```
+---
 
 ## 验证覆盖总结
 
 | 场景 | git diff 状态 | 预期行为 | 实际结果 |
 |------|--------------|----------|----------|
-| 无新增文件 | M (非 .java) | 跳过检查 | ✅ 输出"未发现问题" |
-| 新增文件有违规 | A | 报告 CRITICAL | ✅ 正确报告问题 |
-| 修改文件有违规 | M | 不报告 | ✅ 跳过检查 |
-| 存量文件有违规 | 不在 diff | 不报告 | ✅ 跳过检查 |
-| 指定路径无新增 | A (在其他路径) | 跳过检查 | ✅ 输出"未发现问题" |
+| 无新增文件 | M (非 .java) | 跳过检查 | ✅ 见场景1截图 |
+| 新增文件有违规 | A | 报告 CRITICAL | ✅ 见场景2截图 |
+| 修改文件有违规 | M | 不报告 | ✅ 见场景3截图 |
+| 存量文件有违规 | 不在 diff | 不报告 | ✅ 见场景4截图 |
+| 指定路径无新增 | A (在其他路径) | 跳过检查 | ✅ 见场景5截图 |
+| 全面检查多违规 | A (多个文件) | 并行报告 | ✅ 见场景6截图 |
+
+---
 
 ## 输出格式
 
