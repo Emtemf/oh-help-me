@@ -10,13 +10,26 @@ agent: Explore
 ## 检查范围
 $ARGUMENTS
 
+## 规则来源
+
+本检查遵循以下规则文件（优先级从高到低）：
+
+1. **项目级规则** `.claude/rules/clean-architecture/`
+2. **插件默认规则** `reference/clean-architecture/`
+
+存量代码规则见 `legacy-code.md`。
+
 ## Step 1: 确定检查文件
 
 如果 `$ARGUMENTS` 为空：
 ```bash
 git diff --name-status HEAD
 ```
-只检查状态为 `A`（新增）的 `.java` 文件。
+
+根据 `legacy-code.md` 规则：
+- 状态 `A`（新增）→ 严格检查
+- 状态 `M`（修改）→ 不检查安全问题
+- 不在 diff 中 → 跳过所有检查
 
 如果 `$ARGUMENTS` 指定了路径，只检查该路径下的新增文件。
 
@@ -39,9 +52,3 @@ git diff --name-status HEAD
 ```
 
 无新增文件或无问题则输出：✅ 未发现安全漏洞
-
-## 存量代码规则
-
-- 新建文件（A）→ 严格检查
-- 修改已有文件（M）→ 不检查安全问题（除非用户明确要求）
-- 存量文件未动 → 不检查

@@ -10,25 +10,40 @@ agent: Explore
 ## 检查范围
 $ARGUMENTS
 
+## 规则来源
+
+本检查遵循以下规则文件（优先级从高到低）：
+
+1. **项目级规则** `.claude/rules/clean-architecture/`
+2. **插件默认规则** `reference/clean-architecture/`
+
+规则文件：
+- `boundary.md` - 边界隔离规则（依赖方向、对象边界）
+- `legacy-code.md` - 存量代码处理规则
+
 ## Step 1: 确定检查文件
 
 如果 `$ARGUMENTS` 为空：
 ```bash
 git diff --name-status HEAD
 ```
-只检查状态为 `A`（新增）的文件，跳过 `M`（修改）和存量文件。
 
-如果 `$ARGUMENTS` 指定了路径，只检查该路径下的新增文件（git diff A 状态）。
+根据 `legacy-code.md` 规则：
+- 状态 `A`（新增）→ 严格检查
+- 状态 `M`（修改）→ 跳过架构检查
+- 不在 diff 中 → 跳过所有检查
+
+如果 `$ARGUMENTS` 指定了路径，只检查该路径下的新增文件。
 
 ## Step 2: 执行检查
 
-对每个新增的 `.java` 文件执行以下检查：
+对每个新增的 `.java` 文件，根据 `boundary.md` 执行：
 
-### 依赖方向
+### 依赖方向检查
 - 领域层 import 基础设施层 → 🔴 CRITICAL
 - 应用层 import 接口层 Req/Rsp → 🔴 CRITICAL
 
-### 对象边界
+### 对象边界检查
 - Req/Rsp 传递到应用层/领域层 → 🔴 CRITICAL
 - Entity 泄露到基础设施层外 → 🔴 CRITICAL
 
@@ -41,10 +56,3 @@ git diff --name-status HEAD
 ```
 
 无新增文件或无问题则输出：✅ 未发现架构违规问题
-
-## 存量代码规则
-
-根据 `.claude/rules/clean-architecture/legacy-code.md`：
-- 新建文件（A）→ 严格检查
-- 修改已有文件（M）→ 不检查架构违规
-- 存量文件未动 → 不加载规则，不影响上下文
