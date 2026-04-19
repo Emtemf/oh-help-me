@@ -10,6 +10,13 @@ agent: Explore
 ## 检查范围
 $ARGUMENTS
 
+## Quick Reference
+
+| 规则 | 加载时机 | 文件 |
+|------|----------|------|
+| 边界隔离规则 | 检查依赖方向、对象边界时 | `reference/boundary.md` |
+| 存量代码规则 | 判断 git diff 状态时 | `reference/legacy-code.md` |
+
 ## Step 1: 确定检查文件
 
 如果 `$ARGUMENTS` 为空：
@@ -17,7 +24,7 @@ $ARGUMENTS
 git diff --name-status HEAD
 ```
 
-根据 [reference.md](reference.md) 中的存量代码规则：
+根据 `reference/legacy-code.md`：
 - 状态 `A`（新增）→ 严格检查
 - 状态 `M`（修改）→ 跳过架构检查
 - 不在 diff 中 → 跳过所有检查
@@ -26,7 +33,7 @@ git diff --name-status HEAD
 
 ## Step 2: 执行检查
 
-对每个新增的 `.java` 文件，根据 [reference.md](reference.md) 中的边界隔离规则执行：
+对每个新增的 `.java` 文件，根据 `reference/boundary.md` 执行：
 
 ### 依赖方向检查
 - 领域层 import 基础设施层 → 🔴 CRITICAL

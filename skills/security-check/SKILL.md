@@ -10,6 +10,12 @@ agent: Explore
 ## 检查范围
 $ARGUMENTS
 
+## Quick Reference
+
+| 规则 | 加载时机 | 文件 |
+|------|----------|------|
+| 存量代码规则 | 判断 git diff 状态时 | `reference/legacy-code.md` |
+
 ## Step 1: 确定检查文件
 
 如果 `$ARGUMENTS` 为空：
@@ -17,7 +23,7 @@ $ARGUMENTS
 git diff --name-status HEAD
 ```
 
-根据 [reference.md](reference.md) 中的存量代码规则：
+根据 `reference/legacy-code.md`：
 - 状态 `A`（新增）→ 严格检查
 - 状态 `M`（修改）→ 不检查安全问题
 - 不在 diff 中 → 跳过所有检查
