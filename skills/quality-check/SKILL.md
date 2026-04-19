@@ -13,12 +13,7 @@ $ARGUMENTS
 
 ## 规则来源
 
-本检查遵循以下规则文件（优先级从高到低）：
-
-1. **项目级规则** `.claude/rules/clean-architecture/`
-2. **插件默认规则** `reference/clean-architecture/`
-
-存量代码规则见 `legacy-code.md`。
+优先使用项目级规则 `.claude/rules/clean-architecture/legacy-code.md`，不存在时使用本目录下的 `legacy-code.md`。
 
 ## Step 1: 确定检查文件
 

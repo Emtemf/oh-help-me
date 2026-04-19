@@ -12,12 +12,8 @@ $ARGUMENTS
 
 ## 规则来源
 
-本检查遵循以下规则文件（优先级从高到低）：
+优先使用项目级规则 `.claude/rules/clean-architecture/`，不存在时使用本目录下的默认规则：
 
-1. **项目级规则** `.claude/rules/clean-architecture/`
-2. **插件默认规则** `reference/clean-architecture/`
-
-规则文件：
 - `boundary.md` - 边界隔离规则（依赖方向、对象边界）
 - `legacy-code.md` - 存量代码处理规则
 
