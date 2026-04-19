@@ -14,8 +14,8 @@ $ARGUMENTS
 
 优先使用项目级规则 `.claude/rules/clean-architecture/`，不存在时使用本目录下的默认规则：
 
-- `boundary.md` - 边界隔离规则（依赖方向、对象边界）
-- `legacy-code.md` - 存量代码处理规则
+- [boundary.md](boundary.md) - 边界隔离规则（依赖方向、对象边界）
+- [legacy-code.md](legacy-code.md) - 存量代码处理规则
 
 ## Step 1: 确定检查文件
 
