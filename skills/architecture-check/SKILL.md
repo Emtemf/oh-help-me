@@ -10,13 +10,6 @@ agent: Explore
 ## 检查范围
 $ARGUMENTS
 
-## 规则来源
-
-优先使用项目级规则 `.claude/rules/clean-architecture/`，不存在时使用本目录下的默认规则：
-
-- [boundary.md](boundary.md) - 边界隔离规则（依赖方向、对象边界）
-- [legacy-code.md](legacy-code.md) - 存量代码处理规则
-
 ## Step 1: 确定检查文件
 
 如果 `$ARGUMENTS` 为空：
@@ -24,7 +17,7 @@ $ARGUMENTS
 git diff --name-status HEAD
 ```
 
-根据 `legacy-code.md` 规则：
+根据 [reference.md](reference.md) 中的存量代码规则：
 - 状态 `A`（新增）→ 严格检查
 - 状态 `M`（修改）→ 跳过架构检查
 - 不在 diff 中 → 跳过所有检查
@@ -33,7 +26,7 @@ git diff --name-status HEAD
 
 ## Step 2: 执行检查
 
-对每个新增的 `.java` 文件，根据 `boundary.md` 执行：
+对每个新增的 `.java` 文件，根据 [reference.md](reference.md) 中的边界隔离规则执行：
 
 ### 依赖方向检查
 - 领域层 import 基础设施层 → 🔴 CRITICAL

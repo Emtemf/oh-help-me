@@ -11,10 +11,6 @@ model: haiku
 ## 检查范围
 $ARGUMENTS
 
-## 规则来源
-
-优先使用项目级规则 `.claude/rules/clean-architecture/legacy-code.md`，不存在时使用本目录下的 `legacy-code.md`。
-
 ## Step 1: 确定检查文件
 
 如果 `$ARGUMENTS` 为空：
@@ -22,7 +18,7 @@ $ARGUMENTS
 git diff --name-status HEAD
 ```
 
-根据 `legacy-code.md` 规则：
+根据 [reference.md](reference.md) 中的存量代码规则：
 - 状态 `A`（新增）→ 严格检查
 - 状态 `M`（修改）→ 不检查质量问题
 - 不在 diff 中 → 跳过所有检查
