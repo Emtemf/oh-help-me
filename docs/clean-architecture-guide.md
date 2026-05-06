@@ -128,7 +128,7 @@ public PageDTO<OrderListDTO> listOrders(OrderListCondition condition)
 |---|---|---|---|
 | Req → 字段/DTO | 手写 | 接口层 Controller | Req 是生成的，拆字段即可 |
 | Condition 构造 | 手写 | 接口层 Controller | 简单构造 |
-| Model → DTO | MapStruct | 应用层 dto/mapper/ | Model 稳定字段多，DTO 跟着接口变，MapStruct 编译期生成省手写 |
+| Model → DTO | MapStruct | 应用层 convert/ | Model 稳定字段多，DTO 跟着接口变，MapStruct 编译期生成省手写 |
 | DTO → Rsp | 手写 | 接口层私有方法 | Rsp 是生成的，字段少直接赋值 |
 | 外部响应 → 领域对象 | 手写/MapStruct | 基础设施层 | 外部对象不出基础设施层 |
 
@@ -143,7 +143,7 @@ public PageDTO<OrderListDTO> listOrders(OrderListCondition condition)
 ### MapStruct 使用示例
 
 ```java
-// ===== MapStruct Mapper（放在 application/mapper/） =====
+// ===== MapStruct Mapper（放在 application/convert/） =====
 @Mapper
 public interface OrderDTOMapper {
     OrderDTOMapper INSTANCE = Mappers.getMapper(OrderDTOMapper.class);
@@ -215,13 +215,13 @@ public class OrderDTO {
 ```
 com.example.order
 ├── application/
-│   └── dto/
-│       ├── mapper/                      # MapStruct Mapper（新）
-│       │   ├── OrderDTOMapper.java
-│       │   └── UserDTOMapper.java
-│       └── converter/                   # BeanUtils Converter（旧，逐步删除）
-│           ├── OrderConverter.java      # @Deprecated
-│           └── UserConverter.java       # @Deprecated
+│   ├── convert/                      # MapStruct Convert（新）
+│   │   ├── OrderDTOMapper.java
+│   │   └── UserDTOMapper.java
+│   ├── dto/
+│   │   └── converter/                # BeanUtils Converter（旧，逐步删除）
+│   │       ├── OrderConverter.java   # @Deprecated
+│   │       └── UserConverter.java    # @Deprecated
 ```
 
 ### 迁移步骤
@@ -243,7 +243,7 @@ graph LR
 | 步骤 | 操作 | 说明 |
 |---|---|---|
 | 1 | 标记 `@Deprecated` | 给旧 Converter 加注解，IDE 会警告调用点 |
-| 2 | 新建 MapStruct Mapper | 在 `mapper/` 下创建对应的 Mapper 接口 |
+| 2 | 新建 MapStruct Mapper | 在 `convert/` 下创建对应的 Mapper 接口 |
 | 3 | 替换调用点 | 全局搜索 `XxxConverter.to`，替换为 `XxxDTO.from` |
 | 4 | 删除 Converter | 确认无调用后，删除 `converter/` 下的文件 |
 | 5 | 重复 | 处理下一个 Converter |
@@ -261,7 +261,7 @@ public class OrderConverter {
     }
 }
 
-// ===== 新：MapStruct Mapper（mapper/OrderDTOMapper.java） =====
+// ===== 新：MapStruct Mapper（convert/OrderDTOMapper.java） =====
 @Mapper
 public interface OrderDTOMapper {
     OrderDTOMapper INSTANCE = Mappers.getMapper(OrderDTOMapper.class);
@@ -300,13 +300,13 @@ public class OrderDTO {
 
 ```
 com.example.order
-├── api/                              # 接口层（interface层）
-│   ├── OrderApiImpl.java             # 手写，实现api-codegen生成的接口
+├── api/                              # 接口层（api-codegen 生成）
+│   ├── controller/                   # api-codegen 生成的 Controller
 │   ├── req/                          # api-codegen 生成
 │   ├── rsp/                          # api-codegen 生成
-│   ├── consumer/                     # MQ 消费者
+│   ├── consumer/                     # MQ 消费者（手写）
 │   │   └── OrderEventConsumer.java
-│   └── scheduled/                    # 定时任务
+│   └── scheduled/                    # 定时任务（手写）
 │       └── OrderScheduledJobs.java
 │
 ├── application/                      # 应用层
@@ -315,9 +315,9 @@ com.example.order
 │   │   ├── OrderDTO.java
 │   │   ├── OrderDetailDTO.java
 │   │   ├── CreateOrderDTO.java
-│   │   ├── PageDTO.java
-│   │   └── mapper/                   # MapStruct Mapper
-│   │       └── OrderDTOMapper.java
+│   │   └── PageDTO.java
+│   ├── convert/                      # MapStruct 转换器
+│   │   └── OrderDTOMapper.java
 │   └── condition/
 │       └── OrderListCondition.java
 │

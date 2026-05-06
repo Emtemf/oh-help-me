@@ -11,7 +11,7 @@ paths:
 - MUST: 入参：简单场景直接拆字段，复杂场景用 `XxxDTO`
 - MUST: 查询条件用 `XxxCondition`，放在 `application/condition/`
 - MUST: 出参统一用 `XxxDTO`、`XxxDetailDTO`，放在 `application/dto/`
-- MUST: MapStruct Mapper 放在 `application/mapper/`（与 dto 同级）
+- MUST: MapStruct Mapper 放在 `application/convert/`（与 dto 同级）
 
 ## 应用服务职责
 
@@ -80,12 +80,12 @@ public class OrderDTO {
 
 ## MapStruct Mapper
 
-- MUST: 放在 `application/mapper/` 目录（与 dto 同级）
+- MUST: 放在 `application/convert/` 目录（与 dto 同级）
 - MUST: 使用 instance 模式（不依赖 Spring）
 - MUST: 定义 `Model → DTO` 转换方法
 
 ```java
-// application/mapper/OrderDTOMapper.java
+// application/convert/OrderDTOMapper.java
 @Mapper
 public interface OrderDTOMapper {
     OrderDTOMapper INSTANCE = Mappers.getMapper(OrderDTOMapper.class);

@@ -1,6 +1,6 @@
 ---
 paths:
-  - "**/application/mapper/**"
+  - "**/application/convert/**"
 ---
 
 # MapStruct 规则
@@ -8,7 +8,7 @@ paths:
 ## 使用模式
 
 - MUST: 使用 instance 模式（`Mappers.getMapper()`），不使用 Spring 模式
-- MUST: MapStruct Mapper 放在 `application/mapper/` 目录（与 `dto/` 同级）
+- MUST: MapStruct Mapper 放在 `application/convert/` 目录（与 `dto/` 同级）
 - MUST: 只定义 `Model → DTO` 转换，不定义反向
 
 ## 转换方向一览
@@ -17,7 +17,7 @@ paths:
 |---------|------|-----|------|
 | Req → 字段/DTO | 手写 | 接口层 Controller | Req 是生成的，拆字段即可 |
 | Condition 构造 | 手写 | 接口层 Controller | 简单构造 |
-| Model → DTO | MapStruct | 应用层 mapper/ | 编译期生成，省手写 |
+| Model → DTO | MapStruct | 应用层 convert/ | 编译期生成，省手写 |
 | DTO → Rsp | 手写 | 接口层私有方法 | Rsp 是生成的，字段少直接赋值 |
 | Entity → Model | 手写 | 基础设施层 RepositoryImpl | 基础设施层内转换 |
 | Model → Entity | 手写 | 基础设施层 RepositoryImpl | save 时转换 |
@@ -26,7 +26,7 @@ paths:
 ## MapStruct Mapper 模板
 
 ```java
-// application/mapper/OrderDTOMapper.java
+// application/convert/OrderDTOMapper.java
 @Mapper
 public interface OrderDTOMapper {
     OrderDTOMapper INSTANCE = Mappers.getMapper(OrderDTOMapper.class);
@@ -70,7 +70,7 @@ public class OrderDTO {
 ## 迁移策略（BeanUtils → MapStruct）
 
 1. 标记旧 Converter `@Deprecated`
-2. 在 `mapper/` 下新建 MapStruct Mapper
+2. 在 `convert/` 下新建 MapStruct Mapper
 3. 全局搜索 `XxxConverter.to`，替换为 `XxxDTO.from`
 4. 确认无调用后，删除 `converter/` 下的文件
 
