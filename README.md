@@ -85,6 +85,44 @@
 
 ---
 
+## 架构规范
+
+### 目录结构（按模块划分）
+
+```
+com.example
+├── order/                    # 订单模块
+│   ├── interface/            # 接口层
+│   │   ├── controller/       # api-codegen 生成
+│   │   ├── req/
+│   │   ├── rsp/
+│   │   └── convert/          # Req/Rsp ↔ DTO
+│   ├── application/          # 应用层
+│   │   ├── dto/
+│   │   └── convert/          # DTO ↔ Model
+│   ├── domain/               # 领域层
+│   │   ├── model/
+│   │   └── gateway/
+│   └── infrastructure/       # 基础设施层
+│       ├── entity/
+│       └── convert/          # Entity ↔ Model
+│
+├── payment/                  # 支付模块
+└── user/                     # 用户模块
+```
+
+### 转换规则
+
+每层都有 `convert/` 目录，转换是垂直的：
+
+| 层 | convert 位置 | 转换内容 |
+|---|-------------|---------|
+| 接口层 | interface/convert/ | Req/Rsp ↔ DTO |
+| 应用层 | application/convert/ | DTO ↔ Model |
+| 基础设施层 | infrastructure/convert/ | Entity ↔ Model |
+
+---
+
 ## 验证证据
 
 以下是在真实项目中运行的实际输出截图，证明插件按设计工作。
