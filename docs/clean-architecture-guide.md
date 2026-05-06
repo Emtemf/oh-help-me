@@ -122,15 +122,15 @@ public PageDTO<OrderListDTO> listOrders(OrderListCondition condition)
 
 ### 转换方向与方式
 
-核心原则：**领域对象（Model）是稳定的，DTO 会跟着接口变化，所以 Model → DTO 用 MapStruct 自动生成，其余手写即可。**
+核心原则：**领域对象（Model）是稳定的，DTO 会跟着接口变化。Model → DTO 用 MapStruct 自动生成，复杂逻辑用 default 方法处理，不需要额外手写转换类。**
 
 | 转换方向 | 方式 | 位置 | 说明 |
 |---|---|---|---|
-| Req → 字段/DTO | 手写 | 接口层 Controller | Req 是生成的，拆字段即可 |
-| Condition 构造 | 手写 | 接口层 Controller | 简单构造 |
-| Model → DTO | MapStruct | 应用层 convert/ | Model 稳定字段多，DTO 跟着接口变，MapStruct 编译期生成省手写 |
-| DTO → Rsp | 手写 | 接口层私有方法 | Rsp 是生成的，字段少直接赋值 |
-| 外部响应 → 领域对象 | 手写/MapStruct | 基础设施层 | 外部对象不出基础设施层 |
+| Req → 字段/DTO | 接口层拆分 | 接口层 Controller | Req 是生成的，直接拆字段即可 |
+| Condition 构造 | 接口层拆分 | 接口层 Controller | 简单构造 |
+| Model → DTO | MapStruct + default | 应用层 convert/ | 自动映射 + default 方法处理复杂逻辑 |
+| DTO → Rsp | 接口层拆分 | 接口层私有方法 | Rsp 是生成的，字段少直接赋值 |
+| 外部响应 → 领域对象 | MapStruct + default | 基础设施层 | 外部对象不出基础设施层，用 default 处理复杂转换 |
 
 ### 为什么转换器不收敛到基础设施层？
 
@@ -148,9 +148,22 @@ public PageDTO<OrderListDTO> listOrders(OrderListCondition condition)
 public interface OrderDTOMapper {
     OrderDTOMapper INSTANCE = Mappers.getMapper(OrderDTOMapper.class);
 
+    // 简单字段自动映射
     OrderDTO toDTO(Order order);
     List<OrderDTO> toDTOList(List<Order> orders);
     OrderDetailDTO toDetailDTO(Order order);
+
+    // 复杂逻辑用 default 方法处理
+    default String formatStatus(Order order) {
+        return "状态：" + order.getStatus().getDesc();
+    }
+
+    default BigDecimal calculateDiscount(Order order) {
+        if (order.getTotalAmount().compareTo(BigDecimal.valueOf(1000)) > 0) {
+            return order.getTotalAmount().multiply(BigDecimal.valueOf(0.9));
+        }
+        return order.getTotalAmount();
+    }
 }
 
 // ===== DTO 类里静态工厂方法 =====
@@ -170,9 +183,9 @@ public class OrderDTO {
 ```
 
 **说明：**
-- `INSTANCE` 放在 Mapper 接口里是 MapStruct 标准用法
-- DTO 里的 `from()` 是语法糖，让调用更简洁：`OrderDTO.from(order)` 比 `OrderDTOMapper.INSTANCE.toDTO(order)` 更短
-- 如果字段名完全一致，MapStruct 自动映射，无需额外配置
+- 简单字段：MapStruct 自动映射，无需配置
+- 复杂逻辑：用 `default` 方法处理（如计算折扣、格式化状态）
+- 不需要额外手写转换类，所有逻辑都集中在 Mapper 里
 
 ### 外部端口（六边形架构）
 
@@ -391,7 +404,7 @@ public R<OrderRsp> createOrder(CreateOrderReq req) {
 
 // ===== 应用层 =====
 public Long createOrder(Long userId, List<CreateOrderLineReq> lines) {
-    // Req → Model（手写转换）
+    // Req → Model（接口层拆分后传入）
     List<OrderLine> orderLines = lines.stream()
         .map(l -> new OrderLine(l.getProductId(), l.getQuantity(), l.getPrice()))
         .toList();
@@ -872,7 +885,7 @@ graph TB
 graph LR
     A[OpenAPI 定义] --> B[api-codegen]
     B --> C[Req + Rsp + 接口]
-    C --> D[手写 ApiImpl]
+    C --> D[Controller<br/>api-codegen生成]
     D --> E[ApplicationService]
     E --> F[DomainService]
     F --> G[Repository 接口]
