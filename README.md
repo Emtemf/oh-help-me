@@ -87,28 +87,36 @@
 
 ## 架构规范
 
-### 目录结构（按模块划分）
+### 目录结构（按层划分，层下按模块划分）
 
 ```
 com.example
-├── order/                    # 订单模块
-│   ├── interface/            # 接口层
+├── interface/                # 接口层
+│   ├── order/                # 订单模块
 │   │   ├── controller/       # api-codegen 生成
 │   │   ├── req/
 │   │   ├── rsp/
 │   │   └── convert/          # Req/Rsp ↔ DTO
-│   ├── application/          # 应用层
+│   ├── payment/              # 支付模块
+│   └── user/                 # 用户模块
+├── application/              # 应用层
+│   ├── order/
 │   │   ├── dto/
 │   │   └── convert/          # DTO ↔ Model
-│   ├── domain/               # 领域层
+│   ├── payment/
+│   └── user/
+├── domain/                   # 领域层
+│   ├── order/
 │   │   ├── model/
 │   │   └── gateway/
-│   └── infrastructure/       # 基础设施层
-│       ├── entity/
-│       └── convert/          # Entity ↔ Model
-│
-├── payment/                  # 支付模块
-└── user/                     # 用户模块
+│   ├── payment/
+│   └── user/
+└── infrastructure/           # 基础设施层
+    ├── order/
+    │   ├── entity/
+    │   └── convert/          # Entity ↔ Model
+    ├── payment/
+    └── user/
 ```
 
 ### 转换规则
