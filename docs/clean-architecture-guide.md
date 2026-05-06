@@ -6,7 +6,7 @@
 
 ```mermaid
 graph TB
-    subgraph 触发层
+    subgraph 接口层
         A[Controller<br/>HTTP 入口]
         B[Consumer<br/>MQ 消费者]
         C[ScheduledJob<br/>定时任务]
@@ -129,21 +129,26 @@ public PageDTO<OrderListDTO> listOrders(OrderListCondition condition)
 | Req → 字段/DTO | 接口层拆分 | 接口层 Controller | Req 是生成的，直接拆字段即可 |
 | Condition 构造 | 接口层拆分 | 接口层 Controller | 简单构造 |
 | Model → DTO | MapStruct + default | 应用层 convert/ | 自动映射 + default 方法处理复杂逻辑 |
-| DTO → Rsp | 接口层拆分 | 接口层私有方法 | Rsp 是生成的，字段少直接赋值 |
-| 外部响应 → 领域对象 | MapStruct + default | 基础设施层 | 外部对象不出基础设施层，用 default 处理复杂转换 |
+| DTO → Rsp | 接口层拆分 | 接口层 convert/ | Rsp 是生成的，字段少直接赋值 |
+| Entity ↔ Model | MapStruct + default | 基础设施层 convert/ | 基础设施层内转换 |
+| 外部响应 → 领域对象 | MapStruct + default | 基础设施层 convert/ | 外部对象不出基础设施层 |
 
-### 为什么转换器不收敛到基础设施层？
+### 为什么每层都有 convert？
 
-转换器放在应用层而非基础设施层，原因：
+**转换是垂直的，跟随调用链：**
 
-- **依赖方向**：分层依赖是 接口层 → 应用层 → 领域层 → 基础设施层。`Model → DTO` 转换器依赖 DTO（应用层对象），放基础设施层会反向依赖
-- **职责清晰**：基础设施层只负责 `外部响应 → 领域对象`，混入 `Model → DTO` 会让职责不清
-- **测试便利**：应用层转换器可纯单元测试，放基础设施层则需要 mock 数据库
+```
+接口层调用应用层 → 需要把 Req 转成 DTO，把 DTO 转成 Rsp
+应用层调用领域层 → 需要把 DTO 转成 Model
+基础设施层实现领域层 → 需要把 Model 转成 Entity
+```
+
+每层的 convert 只处理**本层入参到下层入参**的转换，职责清晰，不跨层。
 
 ### MapStruct 使用示例
 
 ```java
-// ===== MapStruct Mapper（放在 application/convert/） =====
+// ===== 应用层：DTO ↔ Model（application/convert/OrderDTOMapper.java） =====
 @Mapper
 public interface OrderDTOMapper {
     OrderDTOMapper INSTANCE = Mappers.getMapper(OrderDTOMapper.class);
@@ -217,106 +222,16 @@ public class OrderDTO {
 
 ---
 
-## 对象转换迁移策略（BeanUtils → MapStruct）
-
-### 背景
-
-存量代码使用 BeanUtils，新代码使用 MapStruct。为保证平滑迁移，建立新旧文件夹共存，逐步替换收敛。
-
-### 目录结构（迁移期）
-
-```
-com.example.order
-├── application/
-│   ├── convert/                      # MapStruct Convert（新）
-│   │   ├── OrderDTOMapper.java
-│   │   └── UserDTOMapper.java
-│   ├── dto/
-│   │   └── converter/                # BeanUtils Converter（旧，逐步删除）
-│   │       ├── OrderConverter.java   # @Deprecated
-│   │       └── UserConverter.java    # @Deprecated
-```
-
-### 迁移步骤
-
-```mermaid
-graph LR
-    A[标记 Converter<br/>@Deprecated] --> B[新建 MapStruct<br/>Mapper]
-    B --> C[替换调用点<br/>Converter → Mapper]
-    C --> D[删除 Converter<br/>文件]
-    D --> E[重复下一个<br/>Converter]
-
-    style A fill:#ffcdd2,stroke:#c62828
-    style B fill:#c8e6c9,stroke:#2e7d32
-    style C fill:#fff9c4,stroke:#f9a825
-    style D fill:#bbdefb,stroke:#1565c0
-    style E fill:#e1bee7,stroke:#7b1fa2
-```
-
-| 步骤 | 操作 | 说明 |
-|---|---|---|
-| 1 | 标记 `@Deprecated` | 给旧 Converter 加注解，IDE 会警告调用点 |
-| 2 | 新建 MapStruct Mapper | 在 `convert/` 下创建对应的 Mapper 接口 |
-| 3 | 替换调用点 | 全局搜索 `XxxConverter.to`，替换为 `XxxDTO.from` |
-| 4 | 删除 Converter | 确认无调用后，删除 `converter/` 下的文件 |
-| 5 | 重复 | 处理下一个 Converter |
-
-### 代码对照
-
-```java
-// ===== 旧：BeanUtils Converter（converter/OrderConverter.java） =====
-@Deprecated(since = "2024-01", forRemoval = true)
-public class OrderConverter {
-    public static OrderDTO toDTO(Order order) {
-        OrderDTO dto = new OrderDTO();
-        BeanUtils.copyProperties(order, dto);
-        return dto;
-    }
-}
-
-// ===== 新：MapStruct Mapper（convert/OrderDTOMapper.java） =====
-@Mapper
-public interface OrderDTOMapper {
-    OrderDTOMapper INSTANCE = Mappers.getMapper(OrderDTOMapper.class);
-
-    OrderDTO toDTO(Order order);
-    List<OrderDTO> toDTOList(List<Order> orders);
-}
-
-// ===== DTO 静态工厂方法 =====
-public class OrderDTO {
-    public static OrderDTO from(Order order) {
-        return OrderDTOMapper.INSTANCE.toDTO(order);
-    }
-}
-```
-
-### 迁移优先级
-
-| 优先级 | 场景 | 原因 |
-|---|---|---|
-| 高 | 频繁调用的 Converter | 性能提升明显 |
-| 高 | 复杂对象转换 | MapStruct 编译期检查，减少运行时错误 |
-| 中 | 简单对象转换 | 收益一般，但统一代码风格 |
-| 低 | 即将废弃的模块 | 不值得迁移 |
-
-### 完成标志
-
-```java
-// converter/ 目录为空或不存在
-// 所有调用点都使用 XxxDTO.from() 或 XxxDTOMapper
-```
-
----
-
 ## 目录结构
 
 ```
 com.example.order
-├── api/                              # 接口层（api-codegen 生成）
+├── interface/                        # 接口层（api-codegen 生成）
 │   ├── controller/                   # api-codegen 生成的 Controller
 │   ├── req/                          # api-codegen 生成
 │   ├── rsp/                          # api-codegen 生成
+│   ├── convert/                      # Req/Rsp ↔ DTO 转换
+│   │   └── OrderRspMapper.java
 │   ├── consumer/                     # MQ 消费者（手写）
 │   │   └── OrderEventConsumer.java
 │   └── scheduled/                    # 定时任务（手写）
@@ -329,7 +244,7 @@ com.example.order
 │   │   ├── OrderDetailDTO.java
 │   │   ├── CreateOrderDTO.java
 │   │   └── PageDTO.java
-│   ├── convert/                      # MapStruct 转换器
+│   ├── convert/                      # DTO ↔ Model 转换
 │   │   └── OrderDTOMapper.java
 │   └── condition/
 │       └── OrderListCondition.java
@@ -348,10 +263,12 @@ com.example.order
 │
 └── infrastructure/                   # 基础设施层
     ├── entity/                       # 数据库实体
-    │   ├── OrderEntity.java          # 对应 order 表
-    │   └── OrderLineEntity.java      # 对应 order_line 表
+    │   ├── OrderEntity.java
+    │   └── OrderLineEntity.java
     ├── repository/
     │   └── OrderRepositoryImpl.java
+    ├── convert/                      # Entity ↔ Model 转换
+    │   └── OrderEntityMapper.java
     ├── mapper/
     │   ├── OrderMapper.java
     │   └── OrderLineMapper.java
@@ -368,6 +285,36 @@ com.example.order
 
 ## 场景一：写操作（创建）
 
+### 各层职责说明
+
+| 层 | 职责 | 说明 |
+|---|---|---|
+| **接口层** | 接收 HTTP 请求、参数校验、调用应用层 | 只做"入口"工作，不包含业务逻辑 |
+| **应用层** | 编排业务流程、调用领域服务、发送 MQ | 协调多个领域服务，处理非核心业务（如 MQ、日志） |
+| **领域层** | 核心业务规则、领域对象创建、状态变更 | 业务核心，不关心数据如何存储 |
+| **基础设施层** | 数据持久化、缓存、外部调用 | 实现领域层定义的接口，具体技术细节 |
+
+**为什么 Repository 是接口？**
+
+```java
+// 领域层定义接口（只关心"需要什么能力"）
+public interface OrderRepository {
+    void save(Order order);
+    Order findById(Long id);
+}
+
+// 基础设施层实现（决定"如何提供能力"）
+public class OrderRepositoryImpl implements OrderRepository {
+    // 当前实现：直接写 MySQL
+    // 未来扩展：可加 Redis 缓存、分库分表等，领域层代码无需改动
+}
+```
+
+好处：
+- 领域层不关心数据存 MySQL 还是 MongoDB，只关心"能存取"
+- 加 Redis 缓存时，只需修改 `RepositoryImpl`，领域层代码零改动
+- 单元测试时，可以 mock `OrderRepository`，无需启动数据库
+
 ```mermaid
 sequenceDiagram
     participant Client
@@ -380,10 +327,15 @@ sequenceDiagram
     participant MQ as MQ Producer
 
     Client->>Controller: POST /orders<br/>CreateOrderReq
+    Note over Controller: 参数校验<br/>Req → 字段拆分
     Controller->>AppService: createOrder(userId, lines)
+    Note over AppService: 编排流程<br/>调用领域服务<br/>发送 MQ
     AppService->>DomainService: createOrder(userId, orderLines)
+    Note over DomainService: 业务规则<br/>计算总价<br/>设置状态
     DomainService->>Repo: save(order)
+    Note over Repo: 接口抽象<br/>不关心存储细节
     Repo->>RepoImpl: save(order)
+    Note over RepoImpl: 具体实现<br/>Entity 转换<br/>写数据库
     RepoImpl->>DB: INSERT
     RepoImpl-->>DomainService: order
     DomainService-->>AppService: order
@@ -431,40 +383,57 @@ public Order createOrder(Long userId, List<OrderLine> lines) {
 // ===== 基础设施层：save 实现 =====
 @Override
 public void save(Order order) {
-    // 领域对象 → Entity 转换
-    OrderEntity entity = toEntity(order);
+    // 领域对象 → Entity 转换（用 MapStruct）
+    OrderEntity entity = OrderEntityMapper.INSTANCE.toEntity(order);
     orderMapper.insert(entity);
-    
+
     // 保存订单行
     for (OrderLine line : order.getLines()) {
-        OrderLineEntity lineEntity = toLineEntity(line, entity.getId());
+        OrderLineEntity lineEntity = OrderEntityMapper.INSTANCE.toLineEntity(line, entity.getId());
         lineMapper.insert(lineEntity);
     }
-}
-
-// Order → OrderEntity 转换（基础设施层内）
-private OrderEntity toEntity(Order order) {
-    OrderEntity entity = new OrderEntity();
-    entity.setId(order.getId());
-    entity.setUserId(order.getUserId());
-    entity.setStatus(order.getStatus().name());
-    entity.setTotalAmount(order.getTotalAmount());
-    return entity;
-}
-
-private OrderLineEntity toLineEntity(OrderLine line, Long orderId) {
-    OrderLineEntity entity = new OrderLineEntity();
-    entity.setOrderId(orderId);
-    entity.setProductId(line.getProductId());
-    entity.setQuantity(line.getQuantity());
-    entity.setPrice(line.getPrice());
-    return entity;
 }
 ```
 
 ---
 
 ## 场景二：读操作（单条查询）
+
+### 各层职责说明
+
+| 层 | 职责 | 说明 |
+|---|---|---|
+| **接口层** | 接收请求、调用应用层、DTO → Rsp 转换 | Rsp 是 api-codegen 生成的，手写赋值 |
+| **应用层** | 调用领域服务、Model → DTO 转换 | 用 MapStruct 自动转换，DTO 字段可按接口需求裁剪 |
+| **领域层** | 调用仓储获取数据 | 不关心数据来源（DB/缓存），只关心"能获取" |
+| **基础设施层** | 缓存策略、数据库查询、Entity → Model 转换 | 缓存逻辑完全封装在 RepositoryImpl，领域层无感知 |
+
+**缓存加在哪里？**
+
+缓存逻辑放在 `RepositoryImpl`（基础设施层），而不是领域层或应用层：
+
+```java
+// 基础设施层实现（领域层无感知）
+@Override
+public Order findById(Long id) {
+    // 1. 先查缓存
+    Order cached = cache.get("order:" + id, Order.class);
+    if (cached != null) return cached;
+
+    // 2. 缓存未命中，查数据库
+    OrderEntity entity = orderMapper.selectById(id);
+    Order order = OrderEntityMapper.INSTANCE.toOrder(entity);
+
+    // 3. 写入缓存
+    cache.set("order:" + id, order, Duration.ofMinutes(30));
+    return order;
+}
+```
+
+好处：
+- 领域层代码不关心缓存，只调用 `findById`
+- 缓存策略变更（如换 Redis、调 TTL）只需改基础设施层
+- 领域层单元测试无需 mock 缓存，只 mock Repository 接口
 
 ```mermaid
 sequenceDiagram
@@ -478,10 +447,14 @@ sequenceDiagram
     participant DB as MySQL
 
     Client->>Controller: GET /orders/{id}
+    Note over Controller: 调用应用层
     Controller->>AppService: getOrder(id)
+    Note over AppService: 调用领域服务<br/>Model → DTO
     AppService->>DomainService: getOrder(id)
+    Note over DomainService: 调用仓储接口<br/>不关心缓存细节
     DomainService->>Repo: findById(id)
     Repo->>RepoImpl: findById(id)
+    Note over RepoImpl: 缓存策略封装在此<br/>领域层无感知
 
     RepoImpl->>Cache: GET order:{id}
     alt 缓存命中
@@ -538,28 +511,12 @@ public Order findById(Long id) {
     // Mapper 返回 Entity，需要转换为领域对象
     OrderEntity entity = orderMapper.selectById(id);
     if (entity != null) {
-        Order order = toOrder(entity);
+        Order order = OrderEntityMapper.INSTANCE.toOrder(entity);
         List<OrderLineEntity> lineEntities = lineMapper.selectByOrderId(id);
-        order.setLines(toOrderLines(lineEntities));
+        order.setLines(OrderEntityMapper.INSTANCE.toOrderLines(lineEntities));
         cache.set("order:" + id, order, Duration.ofMinutes(30));
     }
     return order;
-}
-
-// Entity → 领域对象转换（基础设施层内）
-private Order toOrder(OrderEntity entity) {
-    Order order = new Order();
-    order.setId(entity.getId());
-    order.setUserId(entity.getUserId());
-    order.setStatus(OrderStatus.valueOf(entity.getStatus()));
-    order.setTotalAmount(entity.getTotalAmount());
-    return order;
-}
-
-private List<OrderLine> toOrderLines(List<OrderLineEntity> entities) {
-    return entities.stream()
-        .map(e -> new OrderLine(e.getProductId(), e.getQuantity(), e.getPrice()))
-        .toList();
 }
 ```
 
@@ -632,7 +589,7 @@ public PageDTO<Order> listOrders(OrderListCondition condition) {
 public PageDTO<Order> findByCondition(OrderListCondition condition) {
     List<OrderEntity> entities = orderMapper.selectByCondition(condition);
     List<Order> orders = entities.stream()
-        .map(this::toOrder)
+        .map(OrderEntityMapper.INSTANCE::toOrder)
         .toList();
     // 分页信息从 condition 构造
     return new PageDTO<>(orders, condition.getPageNum(), condition.getPageSize());
@@ -706,7 +663,7 @@ public class WechatPaymentGateway implements PaymentGateway {
 // ===== 基础设施层：save 实现（支付后更新订单） =====
 @Override
 public void save(Order order) {
-    OrderEntity entity = toEntity(order);
+    OrderEntity entity = OrderEntityMapper.INSTANCE.toEntity(order);
     orderMapper.updateById(entity);
 }
 ```
@@ -884,23 +841,21 @@ graph TB
 ```mermaid
 graph LR
     A[OpenAPI 定义] --> B[api-codegen]
-    B --> C[Req + Rsp + 接口]
-    C --> D[Controller<br/>api-codegen生成]
-    D --> E[ApplicationService]
-    E --> F[DomainService]
-    F --> G[Repository 接口]
-    G --> H[RepositoryImpl]
-    H --> I[MyBatis Mapper]
+    B --> C[Req + Rsp + Controller]
+    C --> D[ApplicationService]
+    D --> E[DomainService]
+    E --> F[Repository 接口]
+    F --> G[RepositoryImpl]
+    G --> H[MyBatis Mapper]
 
     style A fill:#ffcdd2,stroke:#c62828
     style B fill:#fff9c4,stroke:#f9a825
     style C fill:#e1f5fe,stroke:#01579b
-    style D fill:#e1f5fe,stroke:#01579b
-    style E fill:#f3e5f5,stroke:#4a148c
+    style D fill:#f3e5f5,stroke:#4a148c
+    style E fill:#fff3e0,stroke:#e65100
     style F fill:#fff3e0,stroke:#e65100
-    style G fill:#fff3e0,stroke:#e65100
+    style G fill:#e8f5e9,stroke:#1b5e20
     style H fill:#e8f5e9,stroke:#1b5e20
-    style I fill:#e8f5e9,stroke:#1b5e20
 ```
 
 ### 修改接口
