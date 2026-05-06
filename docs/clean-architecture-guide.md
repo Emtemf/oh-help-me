@@ -225,61 +225,104 @@ public class OrderDTO {
 ## 目录结构
 
 ```
-com.example.order
-├── interface/                        # 接口层（api-codegen 生成）
-│   ├── controller/                   # api-codegen 生成的 Controller
-│   ├── req/                          # api-codegen 生成
-│   ├── rsp/                          # api-codegen 生成
-│   ├── convert/                      # Req/Rsp ↔ DTO 转换
-│   │   └── OrderRspMapper.java
-│   ├── consumer/                     # MQ 消费者（手写）
-│   │   └── OrderEventConsumer.java
-│   └── scheduled/                    # 定时任务（手写）
-│       └── OrderScheduledJobs.java
+com.example
+├── order/                            # 订单模块
+│   ├── interface/                    # 接口层
+│   │   ├── controller/               # api-codegen 生成的 Controller
+│   │   ├── req/                      # api-codegen 生成
+│   │   ├── rsp/                      # api-codegen 生成
+│   │   ├── convert/                  # Req/Rsp ↔ DTO 转换
+│   │   │   └── OrderRspMapper.java
+│   │   ├── consumer/                 # MQ 消费者
+│   │   │   └── OrderEventConsumer.java
+│   │   └── scheduled/                # 定时任务
+│   │       └── OrderScheduledJobs.java
+│   │
+│   ├── application/                  # 应用层
+│   │   ├── OrderApplicationService.java
+│   │   ├── dto/
+│   │   │   ├── OrderDTO.java
+│   │   │   ├── OrderDetailDTO.java
+│   │   │   ├── CreateOrderDTO.java
+│   │   │   └── PageDTO.java
+│   │   ├── convert/                  # DTO ↔ Model 转换
+│   │   │   └── OrderDTOMapper.java
+│   │   └── condition/
+│   │       └── OrderListCondition.java
+│   │
+│   ├── domain/                       # 领域层
+│   │   ├── service/
+│   │   │   └── OrderService.java
+│   │   ├── model/
+│   │   │   ├── Order.java
+│   │   │   ├── OrderLine.java
+│   │   │   └── OrderStatus.java
+│   │   ├── repository/
+│   │   │   └── OrderRepository.java
+│   │   └── gateway/
+│   │       └── PaymentGateway.java   # 调用支付模块的接口
+│   │
+│   └── infrastructure/               # 基础设施层
+│       ├── entity/
+│       │   ├── OrderEntity.java
+│       │   └── OrderLineEntity.java
+│       ├── repository/
+│       │   └── OrderRepositoryImpl.java
+│       ├── convert/                  # Entity ↔ Model 转换
+│       │   └── OrderEntityMapper.java
+│       ├── mapper/
+│       │   ├── OrderMapper.java
+│       │   └── OrderLineMapper.java
+│       ├── cache/
+│       │   └── OrderCacheClient.java
+│       └── mq/
+│           ├── MQProducer.java
+│           └── OrderMessage.java
 │
-├── application/                      # 应用层
-│   ├── OrderApplicationService.java
-│   ├── dto/
-│   │   ├── OrderDTO.java
-│   │   ├── OrderDetailDTO.java
-│   │   ├── CreateOrderDTO.java
-│   │   └── PageDTO.java
-│   ├── convert/                      # DTO ↔ Model 转换
-│   │   └── OrderDTOMapper.java
-│   └── condition/
-│       └── OrderListCondition.java
+├── payment/                          # 支付模块
+│   ├── interface/
+│   │   ├── controller/
+│   │   ├── req/
+│   │   ├── rsp/
+│   │   └── convert/
+│   ├── application/
+│   │   ├── PaymentApplicationService.java
+│   │   ├── dto/
+│   │   └── convert/
+│   ├── domain/
+│   │   ├── service/
+│   │   │   └── PaymentService.java
+│   │   ├── model/
+│   │   │   ├── Payment.java
+│   │   │   └── PaymentStatus.java
+│   │   └── gateway/
+│   │       └── WechatPayGateway.java # 调用微信支付的接口
+│   └── infrastructure/
+│       ├── entity/
+│       ├── repository/
+│       ├── convert/
+│       └── gateway/
+│           └── WechatPayGatewayImpl.java
 │
-├── domain/                           # 领域层
-│   ├── service/
-│   │   └── OrderService.java
-│   ├── model/
-│   │   ├── Order.java
-│   │   ├── OrderLine.java
-│   │   └── OrderStatus.java
-│   ├── repository/
-│   │   └── OrderRepository.java
-│   └── gateway/
-│       └── PaymentGateway.java
+├── user/                             # 用户模块
+│   ├── interface/
+│   ├── application/
+│   ├── domain/
+│   └── infrastructure/
 │
-└── infrastructure/                   # 基础设施层
-    ├── entity/                       # 数据库实体
-    │   ├── OrderEntity.java
-    │   └── OrderLineEntity.java
-    ├── repository/
-    │   └── OrderRepositoryImpl.java
-    ├── convert/                      # Entity ↔ Model 转换
-    │   └── OrderEntityMapper.java
-    ├── mapper/
-    │   ├── OrderMapper.java
-    │   └── OrderLineMapper.java
-    ├── cache/
-    │   └── CacheClient.java
-    ├── mq/
-    │   ├── MQProducer.java
-    │   └── OrderMessage.java
-    └── gateway/
-        └── WechatPaymentGateway.java
+└── common/                           # 公共模块
+    ├── exception/
+    │   └── BusinessException.java
+    ├── util/
+    │   └── DateUtils.java
+    └── config/
+        └── RedisConfig.java
 ```
+
+**模块间调用**：
+- 订单模块调用支付模块：通过 `PaymentGateway` 接口（定义在 order/domain/gateway/）
+- 支付模块实现：`WechatPayGatewayImpl`（在 payment/infrastructure/gateway/）
+- 这样订单模块不依赖支付模块的具体实现，只依赖接口
 
 ---
 
